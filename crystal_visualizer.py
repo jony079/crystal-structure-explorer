@@ -45,7 +45,7 @@ def main():
         st.session_state["lattice_data"] = ([], 0.0)
 
     # Sidebar controls – returns the current parameter dict
-    params = ui.sidebar_controls()
+    params = ui.sidebar_controls(__import__("config"))
 
     # Re‑compute geometry only when any parameter changed
     atoms, volume = compute_lattice(params)
