@@ -1,28 +1,19 @@
-"""
-=============================================================================
-  Main Executable File ─ Crystal Structure Explorer
-  Combines UI layout elements with high-speed backend calculation engines.
-=============================================================================
-"""
-
 import streamlit as st
 import math
 import time
-
-# মডুলার আর্কিটেকচার ইমপোর্ট (Abstraction boundary)
 import physics_engine as phys
 import ui_components as ui
 
-# 1. Start core runtime instrumentation hook (Observability)
+# Start core runtime instrumentation hook (Observability)
 start_runtime = time.perf_counter()
 
-# Page UI configurations
+# Set layout to wide mode exactly like before
+st.set_page_config(page_title="Crystal Structure Explorer", layout="wide")
 ui.inject_premium_css()
 
-st.markdown("# ⚛️ Crystal Structure Explorer")
-st.markdown("<div class='info-pill'>Modularized High-Performance Engine for Crystallography Mapping.</div>", unsafe_allow_html=True)
+st.title("⚛️ Crystal Structure Explorer")
+st.write("Interactive app for visualizing crystal lattices and simulating X-ray Diffraction (XRD) peaks.")
 
-# Presets Management Configuration
 PRESETS = {
     "Custom":              {"type": "FCC", "a": 4.05, "c": None},
     "Aluminum (Al) – FCC": {"type": "FCC", "a": 4.05, "c": None},
@@ -35,7 +26,7 @@ PRESETS = {
     "Magnesium (Mg) – HCP":{"type": "HCP", "a": 3.21, "c": 5.21},
 }
 
-st.sidebar.markdown("## 🔬 Controls")
+st.sidebar.header("🔬 Controls")
 preset = st.sidebar.selectbox("Element Preset", list(PRESETS.keys()))
 P = PRESETS[preset]
 locked = (preset != "Custom")
@@ -49,8 +40,7 @@ if ctype == "HCP":
     c_default = float(P["c"]) if P["c"] else round(a_val * 1.633, 3)
     c_val = st.sidebar.number_input("Lattice parameter c (Å)", 0.5, 30.0, c_default, 0.01, disabled=locked)
 
-# Miller Indices inputs
-st.sidebar.markdown("### Miller Indices (hkl)")
+st.sidebar.subheader("Miller Indices (hkl)")
 hkl_cols = st.sidebar.columns(3)
 with hkl_cols[0]: h = st.number_input("h", -5, 5, 1, 1)
 with hkl_cols[1]: k = st.number_input("k", -5, 5, 1, 1)
@@ -63,7 +53,7 @@ if h == 0 and k == 0 and l == 0:
     st.error("⚠️ Miller Indices cannot all be zero.")
     st.stop()
 
-# 2. Pipeline Computing Execution calls
+# Computation Pipeline
 d = phys.d_spacing(a_val, h, k, l, crystal_type=ctype, c=c_val)
 r = phys.atomic_radius(a_val, ctype, c=c_val)
 apf = {"SC": 0.524, "BCC": 0.68, "FCC": 0.74, "HCP": 0.74}[ctype]
@@ -72,47 +62,48 @@ cpd = {"SC": "[100]", "BCC": "[111]", "FCC": "[110]", "HCP": "[11̄20]"}[ctype]
 n_atoms = {"SC": 1, "BCC": 2, "FCC": 4, "HCP": 6}[ctype]
 F_sq, F_rel, F_rule = phys.structure_factor(ctype, h, k, l)
 
-# Render KPI Grid Layout Dashboard
-ui.render_kpi_dashboard(d, r, apf, cn, n_atoms, cpd)
+# Layout Setup (Left: 3D Plot, Right: Stats & XRD Plot)
+col1, col2 = st.columns([1.1, 0.9])
 
-tabs = st.tabs(["🔮 3D Structure", "📐 Calculations", "📡 XRD Simulator", "⚡ Structure Factor Rules"])
-
-with tabs[0]:
-    st.markdown("## 3D Unit Cell Mapping")
+with col1:
+    st.subheader("🔮 3D Crystal Lattice Visualization")
     pts, cats = phys.get_lattice_points(ctype, a_val, c_val)
     fig3d = ui.draw_crystal_plot(ctype, pts, cats, atom_scale, c_val, a_val)
     st.plotly_chart(fig3d, use_container_width=True)
 
-with tabs[1]:
-    st.markdown("## Calculation & Bragg Analysis")
-    st.latex(rf"d_{{{h}{k}{l}}} = {d:.4f}\,\text{{Å}}")
+with col2:
+    st.subheader("📐 Crystal & Bragg Parameters")
+    st.metric(label="Interplanar Spacing (d_hkl)", value=f"{d:.4f} Å" if d else "N/A")
+    st.metric(label="Atomic Radius (r)", value=f"{r:.4f} Å")
+    st.metric(label="Atomic Packing Factor (APF)", value=f"{apf*100:.1f}%")
+    
     if d and d > 0:
         sinT = xrd_lambda / (2*d)
         if 0 < sinT <= 1:
-            st.success(f"✅ Bragg Peak Location 2θ: {2 * math.degrees(math.asin(sinT)):.3f}°")
+            st.info(f"📍 Bragg Peak Location 2θ: {2 * math.degrees(math.asin(sinT)):.3f}°")
 
-with tabs[2]:
-    st.markdown("## High-Performance XRD Peaks (Memoized Lookup)")
-    peaks = phys.generate_xrd_peaks_cached(ctype, a_val, xrd_lambda, 90, c=c_val)
-    if peaks:
-        st.dataframe(peaks, column_config={"0": "2-Theta", "1": "Relative Intensity (%)", "2": "Reflecting Planes"})
-
-with tabs[3]:
-    st.markdown("## Geometrical Structure Factor Status")
+    st.subheader("⚡ Structure Factor Status")
     if F_rel < 0.01:
         st.error(f"🚫 Forbidden reflection: {F_rule}")
     else:
         st.success(f"✅ Allowed reflection: {F_rule}")
 
-# 3. Terminate Runtime profiling trace (Observability)
-runtime_duration = (time.perf_counter() - start_runtime) * 1000
+st.markdown("---")
+st.subheader("📡 Simulated X-ray Diffraction (XRD) Pattern")
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Engine Observability")
+peaks = phys.generate_xrd_peaks_cached(ctype, a_val, xrd_lambda, 90, c=c_val)
+if peaks:
+    fig_xrd = ui.draw_xrd_plot(peaks)
+    st.plotly_chart(fig_xrd, use_container_width=True)
+    
+    st.subheader("📋 Peak Intensity Table")
+    st.dataframe(peaks, column_config={"0": "2-Theta", "1": "Relative Intensity (%)", "2": "Reflecting Planes"}, use_container_width=True)
+
+# Terminate profiling trace (Observability Engine)
+runtime_duration = (time.perf_counter() - start_runtime) * 1000
 st.sidebar.markdown(f"""
 <div class='perf-hud'>
-⚙️ Compute Hook: {runtime_duration:.2f} ms<br>
-💾 Cache Framework: Active (Isolated)<br>
-🛡️ Abstraction Leak: Resolved
+⏱️ Compute Hook: {runtime_duration:.2f} ms<br>
+💾 Cache Framework: Active (Memoized)
 </div>
 """, unsafe_allow_html=True)
