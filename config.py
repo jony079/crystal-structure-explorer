@@ -12,14 +12,14 @@ import os
 # Paths
 # ---------------------------------------------------------------------------
 BASE_DIR = pathlib.Path(__file__).parent.resolve()
+STYLE_CSS_PATH = BASE_DIR / "style.css"  # Fixed: look directly in the root directory
 ASSETS_DIR = BASE_DIR / "assets"
-STYLE_CSS_PATH = ASSETS_DIR / "style.css"
 
 # ---------------------------------------------------------------------------
 # Theme (dark mode + glass‑morphism)
 # ---------------------------------------------------------------------------
 PRIMARY_COLOR = "hsl(210, 60%, 55%)"   # deep blue‑gray
-ACCENT_COLOR = "hsl(28, 95%, 52%)"    # vivid orange for KPI values
+ACCENT_COLOR = "hsl(28, 95%, 52%)"     # vivid orange for KPI values
 BACKGROUND_COLOR = "hsl(220, 15%, 10%)"  # very dark background
 CARD_BG = "rgba(255, 255, 255, 0.08)"   # translucent glass card
 
