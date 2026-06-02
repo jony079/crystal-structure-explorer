@@ -1,68 +1,61 @@
-# main.py
-"""Streamlit entry point for the Crystal Structure Explorer.
-
-Keeps UI thin: imports ``ui_components`` for layout, ``physics_engine`` for the
-calculations, and ``config`` for constants. Session state stores the generated
-lattice data so that heavy geometry is computed only when parameters change.
-"""
 import streamlit as st
-from config import APP_TITLE, PAGE_ICON, load_css, THEME, DEFAULT_PARAMS
 import ui_components as ui
 import physics_engine as phy
-from cache import cached
+import config
 
-
-# ---------------------------------------------------------------------------
-# Streamlit page configuration
-# ---------------------------------------------------------------------------
+# ১. পেজ কনফিগারেশন সেটআপ
 st.set_page_config(
-    page_title=APP_TITLE,
-    page_icon=PAGE_ICON,
-    layout="centered",
-    initial_sidebar_state="expanded",
+    page_title=config.APP_TITLE, 
+    page_icon=config.PAGE_ICON, 
+    layout="wide"
 )
-# Inject custom CSS
-st.markdown(f"<style>{load_css()}</style>", unsafe_allow_html=True)
 
+# ২. কাস্টম CSS লোড করা (গ্লাস-মরফিজম থিম)
+try:
+    st.markdown(f"<style>{config.load_css()}</style>", unsafe_allow_html=True)
+except Exception as e:
+    st.warning(f"CSS could not be loaded: {e}")
 
-# ---------------------------------------------------------------------------
-# Helper to compute lattice data only when parameters change (cached)
-# ---------------------------------------------------------------------------
-@cached
+# ৩. ক্রিস্টাল ল্যাটিস কম্পিউটেশন লেয়ার (ক্যাশড)
+@st.cache_data
 def compute_lattice(params):
-    atoms, volume = phy.generate_lattice(params)
-    return atoms, volume
+    return phy.generate_lattice(params)
 
-
-# ---------------------------------------------------------------------------
-# Main app logic
-# ---------------------------------------------------------------------------
+# ৪. মেইন অ্যাপ লজিক
 def main():
-    # Initialise session state defaults (run only once)
+    # সেশন স্টেট ইনিশিয়ালাইজেশন
     if "params" not in st.session_state:
-        st.session_state["params"] = DEFAULT_PARAMS.copy()
+        st.session_state["params"] = config.DEFAULT_PARAMS.copy()
     if "lattice_data" not in st.session_state:
         st.session_state["lattice_data"] = ([], 0.0)
-
-    # Sidebar controls – returns the current parameter dict
-    params = ui.sidebar_controls(__import__("config"))
-
-    # Re‑compute geometry only when any parameter changed
+    
+    # সাইডবার কন্ট্রোলস (কনফিগ মডিউল পাস করা হলো)
+    params = ui.sidebar_controls(config)
+    
+    # প্যারামিটার চেঞ্জ হলে রি-কম্পিউট করা
     atoms, volume = compute_lattice(params)
     st.session_state["lattice_data"] = (atoms, volume)
-
-    # Tab navigation
+    
+    # ট্যাব নেভিগেশন
     explore, info, raw = st.tabs(["Explore", "Info", "Raw Data"])
+    
     with explore:
-        ui.explore_tab(params, phy, cfg=__import__("config"))
+        try:
+            ui.explore_tab(params, phy, config)
+        except TypeError:
+            ui.explore_tab(params, phy, cfg=config)
+            
     with info:
-        ui.about_tab()
+        try:
+            ui.about_tab()
+        except TypeError:
+            ui.about_tab(config)
+            
     with raw:
         st.subheader("Raw lattice coordinates")
         st.write(atoms)
         st.subheader("Unit‑cell volume")
         st.write(f"{volume:.4f} Å³")
-
 
 if __name__ == "__main__":
     main()
